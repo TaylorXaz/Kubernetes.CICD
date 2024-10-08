@@ -1,0 +1,40 @@
+pipeline{
+    agent none
+    stages{
+        stage('mvn-build'){
+            agent {
+                docker {
+                    image '192.168.67.133/library/maven'
+                    args '-v /root/.m2:/root/.m2'
+                }
+            }
+            steps{
+                sh 'cp -rfv /opt/repository /root/.m2/ && ls -l /root/.m2/repository'
+                sh 'mvn package -DskipTests'
+                archiveArtifacts artifacts: '**/target/*.jar', fingerprint: true 
+            }
+        }
+        stage('image-build'){
+            agent any
+            steps{
+                sh 'cd gateway && docker build -t 192.168.67.133/springcloud/gateway -f Dockerfile .'
+                sh 'cd config && docker build -t 192.168.67.133/springcloud/config -f Dockerfile .'
+                sh 'docker login 192.168.67.133 -u=admin -p=Harbor12345'
+                sh 'docker push 192.168.67.133/springcloud/gateway'
+                sh 'docker push 192.168.67.133/springcloud/config'
+            }
+        }
+        stage('cloud-deploy'){
+            agent any
+            steps{
+                sh 'sed -i "s/sqshq\\/piggymetrics-gateway/192.168.67.133\\/springcloud\\/gateway/g" yaml/deployment/gateway-deployment.yaml'
+                sh 'sed -i "s/sqshq\\/piggymetrics-config/192.168.67.133\\/springcloud\\/config/g" yaml/deployment/config-deployment.yaml'
+                sh 'kubectl create ns springcloud'
+                sh 'kubectl apply -f yaml/deployment/gateway-deployment.yaml'
+                sh 'kubectl apply -f yaml/deployment/config-deployment.yaml'
+                sh 'kubectl apply -f yaml/svc/gateway-svc.yaml'
+                sh 'kubectl apply -f yaml/svc/config-svc.yaml'
+            }
+        }
+    }
+}

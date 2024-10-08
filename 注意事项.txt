@@ -1,0 +1,1 @@
+jenkins gitlab java-jre镜像，node节点也需要上传

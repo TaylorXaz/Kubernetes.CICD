@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: devops
+  name: gitlab
+spec:
+  type: NodePort
+  ports:
+  - port: 443
+    nodePort: 30443
+    targetPort: 443
+    name: gitlab-443
+  - port: 80
+    nodePort: 30888
+    targetPort: 80
+    name: gitlab-80
+  selector:
+    app: gitlab
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitlab
+  namespace: devops
+spec:
+  selector:
+    matchLabels:
+      app: gitlab
+  revisionHistoryLimit: 2
+  template:
+    metadata:
+      labels:
+        app: gitlab
+    spec:
+      containers:
+      - image: gitlab/gitlab-ce:latest
+        imagePullPolicy: IfNotPresent
+        name: gitlab
+        env:
+        - name: GITLAB_ROOT_PASSWORD  # 设置root用户密码
+          value: admin@123
+        - name: GITLAB_PORT
+          value: "80"
+        ports:
+        - containerPort: 443
+          name: gitlab-443
+        - containerPort: 80
+          name: gitlab-80
